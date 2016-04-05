@@ -13,8 +13,8 @@ _smash_get_option() {
 }
 
 _smash_get_zone_regexp() {
-    local pattern=$(IFS="|" && echo "${whitelist_zone[*]}")
-    pattern=$(sed 's/\./\\./g' <<< "$group")
+    local pattern=${(j:|:)whitelist_zone}
+    local group=${pattern//./\\.}
     echo "($group)$"
 }
 
