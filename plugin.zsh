@@ -13,8 +13,8 @@ _smash_get_option() {
 }
 
 _smash_get_zone_regexp() {
-    local pattern=$(IFS="|" && echo "${whitelist_zone[*]}")
-    pattern=$(sed 's/\./\\./g' <<< "$group")
+    local pattern=${(j:|:)whitelist_zone}
+    local group=${pattern//./\\.}
     echo "($group)$"
 }
 
@@ -22,9 +22,7 @@ _smash_get_zone_regexp() {
 _smash_get_full_hostname() {
     local hostname="$1"
     local dns_response=$(dig +search +short -t cname "$hostname")
-    [ -n "$dns_response" ] \
-        && echo "${dns_response%.}" \
-        || echo "$hostname"
+    echo "${${dns_response%.}:-$hostname}"
 }
 
 _smash_get_counter() {
