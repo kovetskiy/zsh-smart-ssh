@@ -31,10 +31,10 @@ _smash_get_counter() {
     local hostname="$1"
 
     local dir=$(_smash_get_option counters ~/.ssh/counters/)
-    [ ! -d "$dir" ] && /bin/mkdir -p "$dir"
+    /bin/mkdir -p "$dir"
 
     local file="$dir/$hostname"
-    [ ! -f "$file" ] && touch "$file"
+    touch "$file"
 
     local counter=$(cat "$file")
     echo "${counter:-0}"
@@ -61,7 +61,7 @@ _smash_is_synced_hostname() {
     local hostname="$1"
 
     local dir=$(_smash_get_option syncs ~/.ssh/syncs/)
-    [ ! -d "$dir" ] && /bin/mkdir -p "$dir"
+    /bin/mkdir -p "$dir"
 
     [ -f "$dir/$hostname" ]
     return $?
@@ -71,7 +71,7 @@ _smash_set_synced() {
     local hostname="$1"
 
     local dir=$(_smash_get_option syncs ~/.ssh/syncs/)
-    [ ! -d "$dir" ] && /bin/mkdir -p "$dir"
+    /bin/mkdir -p "$dir"
 
     touch "$dir/$hostname"
 }
