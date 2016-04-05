@@ -46,7 +46,7 @@ _smash_set_counter() {
 
     local dir=$(_smash_get_option counters ~/.ssh/counters/)
 
-    echo -n "$value" > "$dir/$hostname"
+    echo -n "$value" >! "$dir/$hostname"
 }
 
 _smash_remove_counter() {
