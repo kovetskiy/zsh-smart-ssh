@@ -91,7 +91,7 @@ _smash_get_auth_count() {
 }
 
 _smash_copy_id() {
-    local username="$1"
+    local login="$1"
     local hostname="$2"
     local identity="$3"
     local output
@@ -99,112 +99,46 @@ _smash_copy_id() {
     output=$(ssh-copy-id \
             ${identity:+-i${identity}} \
             -o "PubkeyAuthentication=no" -o "ControlMaster=no" \
-            "$username@$hostname" 2>&1)
+            "${login:+${login}@}$hostname" 2>&1)
     if [[ $? -ne 0 ]]; then
         echo "$output"
         return 1
     fi
 }
 
-_smash_parse_commmand_line() {
-    # for ## pattern in case
-    setopt local_options extended_glob
+smart-ssh() {
+    local login
+    local hostname
+    local identity
+    local interactive
+    local opts
 
-    # from man ssh
-    local opts_without_arg="1246AaCfGgKkMNnqsTtVvXxYy"
-    local opts_with_arg="bcDEeFIiLlmOopQRSWw"
+    # workaround for parsing cases like ssh -X hostname -t command
+    while [ ! "$hostname" ]; do
+        zparseopts -a opts -D \
+            'b:' 'c:' 'D:' 'E:' 'e:' 'F:' 'I:' 'L:' 'm:' 'O:' 'o:' \
+            'p:' 'Q:' 'R:' 'S:' 'W:' 'w:' \
+            'l:=login' \
+            'i:=identity' \
+            '1' '2' '4' '6' 'A' 'a' 'C' 'f' 'G' 'g' 'K' 'k' 'M' 'N' 'n' 'q' \
+            's' 'T' 'V' 'v' 'X' 'x' 'Y' 'y' \
+            't=interactive'
 
-    local opts=()
-    local positionals=()
-
-    local username=""
-    local identity=""
-
-    # parse ssh options and split flags from positional arguments
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            # zsh '##' == regexp '+'
-            -[$opts_without_arg]##)
-                opts+=$1
-                ;;
-
-            -l)
-                username=$2
-                shift
-                ;;
-
-            -l*)
-                username=${1#-l}
-                ;;
-
-            -i)
-                identity=$2
-                opts+=$1$2
-                shift
-                ;;
-
-            -i*)
-                identity=${1#-i}
-                opts+=$1
-                ;;
-
-            -[$opts_with_arg])
-                opts+=$1$2
-                shift
-                ;;
-
-            -[$opts_with_arg]*)
-                opts+=$1
-                ;;
-
-            -*)
-                echo unknown ssh flag: "$1"
-                return 1
-                ;;
-
-            *@*)
-                username=${1%@*}
-                positionals+=${1#*@}
-                ;;
-
-            *)
-                positionals+=$1
-                ;;
-        esac
+        hostname="$1"
+        if [ ! "$hostname" ]; then
+            echo smart-ssh: hostname is not specified
+            exec ssh -h
+        fi
 
         shift
-
-        if [ ${#positionals} -ge 2 ]; then
-            break
-        fi
     done
 
-    if [ $# -gt 0 ]; then
-        positionals+=($@)
-    fi
+    opts+=($interactive $login $identity)
 
-    export _ssh_username=$username
-    export _ssh_identity=$identity
-    export _ssh_hostname=${positionals:0:1}
-    export _ssh_opts=$(_smash_serialize_array "${opts[@]}")
-    export _ssh_command=$(_smash_serialize_array ${positionals:1})
-}
-
-_smash_serialize_array() {
-    echo -E ${(qqq)@}
-}
-
-smart-ssh() {
-    _smash_parse_commmand_line "${@}"
-
-    local opts=$_ssh_opts
-    local username=$_ssh_username
-    local identity=$_ssh_identity
-    local hostname=$_ssh_hostname
-    local command=$_ssh_command
-
-    if [ $? -gt 0 ]; then
-        exit $?
+    if [ "${hostname%@*}" != "$hostname" ]; then
+        opts+=(-l${hostname%@*})
+        login=${hostname%@*}
+        hostname=${hostname#*@}
     fi
 
     local full_hostname=$(_smash_get_full_hostname "$hostname")
@@ -226,17 +160,11 @@ smart-ssh() {
 
 
     if $should_sync; then
-        if _smash_copy_id "$username" "$full_hostname" "$identity"; then
+        if _smash_copy_id "$login" "$full_hostname" "$identity"; then
             _smash_remove_counter "$full_hostname"
             _smash_set_synced "$full_hostname"
         fi
     fi
 
-    # (z) will split serialized options using shell syntax, but not remove
-    #     quotes
-    # (Q) will remove leftover quotes
-    ssh ${(Q)${(z)opts}} ${username:+-l${username}} "$hostname" \
-        ${command:+"${(Q)command}"} # will pass command only if it's not empty
-
-    return $?
+    ssh "${opts[@]}" "$hostname" ${@}
 }
