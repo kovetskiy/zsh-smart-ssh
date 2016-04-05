@@ -88,29 +88,18 @@ _smash_is_in_whitelist() {
     return 1
 }
 
-_smash_get_username() {
-    _smash_get_option username $(whoami)
-}
-
 _smash_get_auth_count() {
     _smash_get_option auth-count 3
 }
 
-_smash_get_ssh_options() {
-    local variable="$1"
-    zstyle -a $_smash_zstyle ssh-options $variable
-    if [ $? -ne 0 ]; then
-        $variable=("-t")
-    fi
-}
-
-
 _smash_copy_id() {
     local username="$1"
     local hostname="$2"
+    local identity="$3"
     local output
 
     output=$(ssh-copy-id \
+            ${identity:+-i${identity}} \
             -o "PubkeyAuthentication=no" -o "ControlMaster=no" \
             "$username@$hostname" 2>&1)
     if [[ $? -ne 0 ]]; then
@@ -119,55 +108,138 @@ _smash_copy_id() {
     fi
 }
 
+_smash_parse_commmand_line() {
+    # for ## pattern in case
+    setopt local_options extended_glob
 
-_smash_ssh() {
-    local username="$1"
-    local hostname="$2"
-    local cmd="$3"
+    # from man ssh
+    local opts_without_arg="1246AaCfGgKkMNnqsTtVvXxYy"
+    local opts_with_arg="bcDEeFIiLlmOopQRSWw"
 
-    local options
-    _smash_get_ssh_options options
+    local opts=()
+    local positionals=()
 
-    if [ -n "$cmd" ]; then
-        options+=("$cmd")
+    local username=""
+    local identity=""
+
+    # parse ssh options and split flags from positional arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            # zsh '##' == regexp '+'
+            -[$opts_without_arg]##)
+                opts+=$1
+                ;;
+
+            -l)
+                username=$2
+                shift
+                ;;
+
+            -l*)
+                username=${1#-l}
+                ;;
+
+            -i)
+                identity=$2
+                opts+=$1$2
+                shift
+                ;;
+
+            -i*)
+                identity=${1#-i}
+                opts+=$1
+                ;;
+
+            -[$opts_with_arg])
+                opts+=$1$2
+                shift
+                ;;
+
+            -[$opts_with_arg]*)
+                opts+=$1
+                ;;
+
+            -*)
+                echo unknown ssh flag: "$1"
+                return 1
+                ;;
+
+            *@*)
+                username=${1%@*}
+                positionals+=${1#*@}
+                ;;
+
+            *)
+                positionals+=$1
+                ;;
+        esac
+
+        shift
+
+        if [ ${#positionals} -ge 2 ]; then
+            break
+        fi
+    done
+
+    if [ $# -gt 0 ]; then
+        positionals+=($@)
     fi
 
-    ssh "$hostname" -l "$username" ${options[@]}
-    return $?
+    export _ssh_username=$username
+    export _ssh_identity=$identity
+    export _ssh_hostname=${positionals:0:1}
+    export _ssh_opts=$(_smash_serialize_array "${opts[@]}")
+    export _ssh_command=$(_smash_serialize_array ${positionals:1})
+}
+
+_smash_serialize_array() {
+    echo -E ${(qqq)@}
 }
 
 smart-ssh() {
-    [ $# -gt 0 ] || return 1
+    _smash_parse_commmand_line "${@}"
 
-    local hostname=$(_smash_get_full_hostname "$1")
-    shift
-    local cmd="$@"
+    local opts=$_ssh_opts
+    local username=$_ssh_username
+    local identity=$_ssh_identity
+    local hostname=$_ssh_hostname
+    local command=$_ssh_command
 
-    local username=$(_smash_get_username)
+    if [ $? -gt 0 ]; then
+        exit $?
+    fi
+
+    local full_hostname=$(_smash_get_full_hostname "$hostname")
 
     local should_sync=false
-    if ! _smash_is_synced_hostname "$hostname"; then
-        if _smash_is_in_whitelist "$hostname"; then
+    if ! _smash_is_synced_hostname "$full_hostname"; then
+        if _smash_is_in_whitelist "$full_hostname"; then
             should_sync=true
         else
-            local counter=$(_smash_get_counter "$hostname")
+            local counter=$(_smash_get_counter "$full_hostname")
             counter=$((counter+1))
             if [ $counter -ge $(_smash_get_auth_count) ]; then
                 should_sync=true
             fi
-            _smash_set_counter "$hostname" $counter
+
+            _smash_set_counter "$full_hostname" $counter
         fi
     fi
 
 
     if $should_sync; then
-        if _smash_copy_id "$username" "$hostname"; then
-            _smash_remove_counter "$hostname"
-            _smash_set_synced "$hostname"
+        if _smash_copy_id "$username" "$full_hostname" "$identity"; then
+            _smash_remove_counter "$full_hostname"
+            _smash_set_synced "$full_hostname"
         fi
     fi
 
-    _smash_ssh "$username" "$hostname" "$cmd"
+    # (z) will split serialized options using shell syntax, but not remove
+    #     quotes
+    # (Q) will remove leftover quotes
+    ssh ${(Q)${(z)opts}} ${username:+-l${username}} "$hostname" \
+        ${command:+"${(Q)command}"} # will pass command only if it's not empty
+
     return $?
 }
 
