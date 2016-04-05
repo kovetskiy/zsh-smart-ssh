@@ -1,0 +1,7 @@
+#compdef smart-ssh
+
+function _smart-ssh() {
+    service="ssh" _ssh "${@}"
+}
+
+_smart-ssh "${@}"

@@ -170,5 +170,3 @@ smart-ssh() {
     _smash_ssh "$username" "$hostname" "$cmd"
     return $?
 }
-
-compdef smart-ssh=ssh
