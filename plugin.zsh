@@ -240,5 +240,3 @@ smart-ssh() {
 
     return $?
 }
-
-compdef smart-ssh=ssh
