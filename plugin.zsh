@@ -107,6 +107,44 @@ _smash_get_auth_count() {
     _smash_get_option auth-count 3
 }
 
+_smash_is_smart_host_key_checking_enabled() {
+    local value=$(_smash_get_option smart-host-key-checking true)
+    if [ "$value" = "true" ] \
+    || [ "$value" = "yes" ] \
+    || [ "$value" = "1" ] \
+    || [ $value ]; then
+        return 0;
+    fi
+
+    return 1;
+}
+
+_smash_is_known_host() {
+    local hostname="$1"
+    local port="$2"
+
+    local address="$hostname"
+    if [ "$port" ]; then
+        address="[$hostname]:$port"
+    fi
+
+    ssh-keygen -F "$address" > /dev/null
+    return $?
+}
+
+_smash_keyscan() {
+    local hostname="$1"
+    local port="${2:-22}"
+
+    local output=$(
+        { ssh-keyscan -p "$port" "$hostname" >> ~/.ssh/known_hosts; } 2>&1
+    )
+    if [ $? -ne 0 ]; then
+        echo "$output" >&2
+        return $?
+    fi
+}
+
 _smash_copy_id() {
     local login="$1"
     local hostname="$2"
@@ -126,6 +164,7 @@ _smash_copy_id() {
 smart-ssh() {
     local login
     local hostname
+    local port
     local identity
     local interactive
     local opts
@@ -136,7 +175,8 @@ smart-ssh() {
     while [ ! "$hostname" ]; do
         zparseopts -a opts -D \
             'b:' 'c:' 'D:' 'E:' 'e:' 'F:' 'I:' 'L:' 'm:' 'O:' 'o:' \
-            'p:' 'Q:' 'R:' 'S:' 'W:' 'w:' \
+            'p:=port' \
+            'Q:' 'R:' 'S:' 'W:' 'w:' \
             'l:=login' \
             'i:=identity' \
             '1' '2' '4' '6' 'A' 'a' 'C' 'f' 'G' 'g' 'K' 'k' 'M' 'N' 'n' 'q' \
@@ -153,7 +193,7 @@ smart-ssh() {
         shift
     done
 
-    opts+=($interactive $login $identity)
+    opts+=($interactive $login $identity $port)
 
     if [ "${hostname%@*}" != "$hostname" ]; then
         opts+=(-l${hostname%@*})
@@ -178,6 +218,11 @@ smart-ssh() {
         fi
     fi
 
+    if _smash_is_smart_host_key_checking_enabled; then
+        if ! _smash_is_known_host "$full_hostname" "$port"; then
+            _smash_keyscan "$full_hostname" "$port"
+        fi
+    fi
 
     if $should_sync; then
         if _smash_copy_id "$login" "$full_hostname" "$identity"; then
