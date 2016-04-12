@@ -85,6 +85,10 @@ _smash_is_in_whitelist() {
     return 1
 }
 
+_smash_get_ssh() {
+    _smash_get_option ssh 'command ssh'
+}
+
 _smash_get_auth_count() {
     _smash_get_option auth-count 3
 }
@@ -111,6 +115,8 @@ smart-ssh() {
     local identity
     local interactive
     local opts
+    local full_hostname
+    local should_sync
 
     # workaround for parsing cases like ssh -X hostname -t command
     while [ ! "$hostname" ]; do
@@ -141,9 +147,9 @@ smart-ssh() {
         hostname=${hostname#*@}
     fi
 
-    local full_hostname=$(_smash_get_full_hostname "$hostname")
+    full_hostname=$(_smash_get_full_hostname "$hostname")
 
-    local should_sync=false
+    should_sync=false
     if ! _smash_is_synced_hostname "$full_hostname"; then
         if _smash_is_in_whitelist "$full_hostname"; then
             should_sync=true
@@ -166,5 +172,5 @@ smart-ssh() {
         fi
     fi
 
-    command ssh "${opts[@]}" "$full_hostname" ${@}
+    ${${(z)$(_smash_get_ssh)}[@]} "${opts[@]}" "$full_hostname" ${@}
 }
