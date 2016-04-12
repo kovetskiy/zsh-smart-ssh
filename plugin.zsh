@@ -166,5 +166,5 @@ smart-ssh() {
         fi
     fi
 
-    ssh "${opts[@]}" "$hostname" ${@}
+    ssh "${opts[@]}" "$full_hostname" ${@}
 }
