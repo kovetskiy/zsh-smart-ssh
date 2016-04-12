@@ -18,7 +18,6 @@ _smash_get_zone_regexp() {
     echo "($group)$"
 }
 
-
 _smash_get_full_hostname() {
     local hostname="$1"
     local dns_response=$(dig +search +short -t cname "$hostname")
@@ -127,7 +126,8 @@ smart-ssh() {
         hostname="$1"
         if [ ! "$hostname" ]; then
             echo smart-ssh: hostname is not specified
-            exec ssh -h
+            command ssh
+            return $?
         fi
 
         shift
@@ -166,5 +166,5 @@ smart-ssh() {
         fi
     fi
 
-    ssh "${opts[@]}" "$full_hostname" ${@}
+    command ssh "${opts[@]}" "$full_hostname" ${@}
 }
