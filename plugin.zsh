@@ -20,8 +20,22 @@ _smash_get_zone_regexp() {
 
 _smash_get_full_hostname() {
     local hostname="$1"
-    local dns_response=$(dig +search +short -t cname "$hostname")
-    echo "${${dns_response%.}:-$hostname}"
+
+    # loci.lname.s.         1    IN      CNAME   foci.common.local.s.
+    # loci.common.local.s.  2    IN      A       127.0.0.2
+    local full_hostname=$(dig +noall +search +answer "$hostname" \
+        | awk '{
+            if ($4 == "CNAME") {
+                print $5;
+            } else {
+                print $1;
+            }
+
+            exit 0;
+        }'
+    )
+
+    echo "${${full_hostname%.}:-$hostname}"
 }
 
 _smash_get_counter() {
