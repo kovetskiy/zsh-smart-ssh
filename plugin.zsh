@@ -172,8 +172,8 @@ smart-ssh() {
     local should_sync
 
     # workaround for parsing cases like ssh -X hostname -t command
-    while [ ! "$hostname" ]; do
-        zparseopts -a opts -D \
+    while [ ! "$hostname" -o "${1[1]}" = "-" ]; do
+        zparseopts -a opts -K -D \
             'b:' 'c:' 'D:' 'E:' 'e:' 'F:' 'I:' 'L:' 'm:' 'O:' 'o:' \
             'p:=port' \
             'Q:' 'R:' 'S:' 'W:' 'w:' \
@@ -183,14 +183,16 @@ smart-ssh() {
             's' 'T' 'V' 'v' 'X' 'x' 'Y' 'y' \
             't=interactive'
 
-        hostname="$1"
+        hostname="${hostname:-$1}"
         if [ ! "$hostname" ]; then
             echo smart-ssh: hostname is not specified
             command ssh
             return $?
         fi
 
-        shift
+        if [[ "${*}" ]]; then
+            shift
+        fi
     done
 
     opts+=($interactive $login $identity $port)
@@ -219,13 +221,13 @@ smart-ssh() {
     fi
 
     if _smash_is_smart_host_key_checking_enabled; then
-        if ! _smash_is_known_host "$full_hostname" "$port"; then
-            _smash_keyscan "$full_hostname" "$port"
+        if ! _smash_is_known_host "$full_hostname" "${port[2]:-}"; then
+            _smash_keyscan "$full_hostname" "${port[2]:-}"
         fi
     fi
 
     if $should_sync; then
-        if _smash_copy_id "$login" "$full_hostname" "$identity"; then
+        if _smash_copy_id "${login[2]:-}" "$full_hostname" "${identity[2]:-}"; then
             _smash_remove_counter "$full_hostname"
             _smash_set_synced "$full_hostname"
         fi
