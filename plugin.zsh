@@ -149,11 +149,13 @@ _smash_copy_id() {
     local login="$1"
     local hostname="$2"
     local identity="$3"
+    local port="$4"
     local output
 
     output=$(ssh-copy-id \
             ${identity:+-i${identity}} \
             -o "PubkeyAuthentication=no" -o "ControlMaster=no" \
+            ${port:+-p$port} \
             "${login:+${login}@}$hostname" 2>&1)
     if [[ $? -ne 0 ]]; then
         echo "$output"
@@ -227,7 +229,9 @@ smart-ssh() {
     fi
 
     if $should_sync; then
-        if _smash_copy_id "${login[2]:-}" "$full_hostname" "${identity[2]:-}"; then
+        if _smash_copy_id "${login[2]:-}" "$full_hostname" "${identity[2]:-}" \
+                "${port[2]:-}"
+        then
             _smash_remove_counter "$full_hostname"
             _smash_set_synced "$full_hostname"
         fi
