@@ -169,7 +169,7 @@ smart-ssh() {
     local port
     local identity
     local interactive
-    local opts
+    local opts=()
     local full_hostname
     local should_sync
 
@@ -237,5 +237,5 @@ smart-ssh() {
         fi
     fi
 
-    ${${(z)$(_smash_get_ssh)}[@]} "${opts[@]}" "$full_hostname" ${@}
+    ${${(z)$(_smash_get_ssh)}[@]} ${opts:+"${opts[@]}"} "$full_hostname" ${@}
 }
