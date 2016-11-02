@@ -185,6 +185,10 @@ smart-ssh() {
             's' 'T' 'V' 'v' 'X' 'x' 'Y' 'y' \
             't=interactive'
 
+        if [ "$hostname" ]; then
+            break
+        fi
+
         hostname="${hostname:-$1}"
         if [ ! "$hostname" ]; then
             echo smart-ssh: hostname is not specified
@@ -192,9 +196,7 @@ smart-ssh() {
             return $?
         fi
 
-        if [[ "${*}" ]]; then
-            shift
-        fi
+        shift
     done
 
     opts+=($interactive $login $identity $port)
