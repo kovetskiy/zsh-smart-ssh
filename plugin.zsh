@@ -203,8 +203,10 @@ smart-ssh() {
 
     if [ "${hostname%@*}" != "$hostname" ]; then
         opts+=(-l${hostname%@*})
-        login=${hostname%@*}
+        username=${hostname%@*}
         hostname=${hostname#*@}
+    else
+        username=${login[2]:-}
     fi
 
     full_hostname=$(_smash_get_full_hostname "$hostname")
@@ -231,7 +233,7 @@ smart-ssh() {
     fi
 
     if $should_sync; then
-        if _smash_copy_id "${login[2]:-}" "$full_hostname" "${identity[2]:-}" \
+        if _smash_copy_id "$username" "$full_hostname" "${identity[2]:-}" \
                 "${port[2]:-}"
         then
             _smash_remove_counter "$full_hostname"
