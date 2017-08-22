@@ -163,6 +163,23 @@ _smash_copy_id() {
     fi
 }
 
+_smash_is_key_installed() {
+    local login="$1"
+    local hostname="$2"
+    local identity="$3"
+    local port="$4"
+
+    command ssh \
+            ${identity:+-i${identity}} \
+            -o "PubkeyAuthentication=no" -o "ControlMaster=no" \
+            ${port:+-p$port} \
+            "${login:+${login}@}$hostname" \
+            -nT \
+            2>/dev/null
+
+    return $?
+}
+
 smart-ssh() {
     local login
     local hostname
@@ -233,9 +250,16 @@ smart-ssh() {
     fi
 
     if $should_sync; then
-        if _smash_copy_id "$username" "$full_hostname" "${identity[2]:-}" \
-                "${port[2]:-}"
+        if ! _smash_is_key_installed "$username" "$full_hostname" \
+                "${identity[2]:-}" "${port[2]:-}"
         then
+            if _smash_copy_id "$username" "$full_hostname" "${identity[2]:-}" \
+                    "${port[2]:-}"
+            then
+                _smash_remove_counter "$full_hostname"
+                _smash_set_synced "$full_hostname"
+            fi
+        else
             _smash_remove_counter "$full_hostname"
             _smash_set_synced "$full_hostname"
         fi
